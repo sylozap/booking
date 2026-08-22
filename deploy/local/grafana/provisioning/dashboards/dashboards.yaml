@@ -1,0 +1,15 @@
+# Dashboards themselves arrive in phase 7; the provider exists now so adding
+# one is dropping a JSON file into deploy/local/grafana/dashboards.
+apiVersion: 1
+
+providers:
+  - name: booking
+    orgId: 1
+    folder: Booking
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

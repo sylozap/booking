@@ -1,0 +1,72 @@
+# Single ingestion point for all telemetry (D8). Services speak OTLP to the
+# collector and know nothing about Prometheus, Loki or Tempo; swapping a
+# backend is a change here, not in five services.
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 5s
+  # Fail before the collector itself becomes the outage.
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 75
+    spike_limit_percentage: 15
+
+exporters:
+  otlp/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+
+  # Loki 3.x ingests OTLP natively; resource attributes become labels, so
+  # label discipline lives in the services (ADR-0008).
+  otlphttp/loki:
+    endpoint: http://loki:3100/otlp
+    tls:
+      insecure: true
+
+  # Prometheus scrapes the collector rather than the services: services stay
+  # push-only over OTLP and need no scrape endpoint of their own.
+  prometheus:
+    endpoint: 0.0.0.0:8889
+    resource_to_telemetry_conversion:
+      enabled: true
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+service:
+  extensions: [health_check]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlp/tempo]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlphttp/loki]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [prometheus]
+  telemetry:
+    logs:
+      level: info
+    metrics:
+      # The collector's own metrics (refused spans, queue depth) matter as much
+      # as the services'. Bound to all interfaces so Prometheus can reach it;
+      # the default is loopback inside the container.
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: 0.0.0.0
+                port: 8888
