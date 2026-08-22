@@ -32,5 +32,21 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  # Availability cache and JWT denylist. Persistence is off on purpose: the
+  # write path never reads this cache, correctness comes from the EXCLUDE
+  # constraint, and losing Redis must only cost latency (D25).
+  redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "${REDIS_HOST_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    restart: unless-stopped
+
 volumes:
   postgres-data:
