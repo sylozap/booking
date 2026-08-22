@@ -1,0 +1,39 @@
+# Workspace root. Not an installable package itself (`tool.uv.package = false`):
+# it only aggregates the workspace members so that `uv sync` provisions a single
+# environment containing every service and the chassis.
+[project]
+name = "booking-platform"
+version = "0.1.0"
+description = "SaaS online booking platform: multi-tenant, event-driven microservices."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "chassis",
+    "identity",
+    "catalog",
+    "booking",
+    "payment",
+    "notification",
+]
+
+[dependency-groups]
+dev = [
+    "mypy>=1.13",
+    "pre-commit>=4.0",
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.8",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["libs/chassis", "services/*"]
+
+[tool.uv.sources]
+chassis = { workspace = true }
+identity = { workspace = true }
+catalog = { workspace = true }
+booking = { workspace = true }
+payment = { workspace = true }
+notification = { workspace = true }

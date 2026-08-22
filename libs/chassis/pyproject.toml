@@ -1,0 +1,13 @@
+[project]
+name = "chassis"
+version = "0.1.0"
+description = "Cross-cutting service infrastructure shared by all services. Contains no domain types (D7)."
+requires-python = ">=3.12,<3.13"
+dependencies = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/chassis"]
