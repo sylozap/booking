@@ -1,0 +1,50 @@
+# Hooks mirror the CI quality job, so a red pipeline is not the first place a
+# violation shows up. Install with `make hooks`.
+default_install_hook_types: [pre-commit, commit-msg]
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: check-toml
+      - id: check-yaml
+        args: [--allow-multiple-documents]  # Kubernetes manifests.
+      - id: detect-private-key  # D52: age keys live outside the repository.
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: trailing-whitespace
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.4
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v4.11.0
+    hooks:
+      - id: commitizen  # CODING_STANDARDS 15: Conventional Commits.
+        stages: [commit-msg]
+
+  - repo: local
+    hooks:
+      # mypy runs from the uv environment: it must see the workspace packages
+      # installed, which a pre-commit-managed virtualenv would not provide.
+      - id: mypy
+        name: mypy (strict)
+        entry: uv run mypy
+        language: system
+        types: [python]
+        pass_filenames: false
+        require_serial: true
+
+      - id: uv-lock-check
+        name: uv lock is up to date
+        entry: uv lock --check
+        language: system
+        files: ^(pyproject\.toml|uv\.lock|(libs|services)/.*/pyproject\.toml)$
+        pass_filenames: false
