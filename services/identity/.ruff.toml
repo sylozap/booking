@@ -1,0 +1,13 @@
+# Extends the workspace configuration and adds the one rule that can only be
+# stated per service: no service may import another service (ADR-0009, D7).
+# Between services there are events and HTTP contracts, nothing else.
+extend = "../../pyproject.toml"
+
+[lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[lint.flake8-tidy-imports.banned-api]
+"catalog".msg = "Importing another service creates a distributed monolith (D7). Use events or HTTP contracts."
+"booking".msg = "Importing another service creates a distributed monolith (D7). Use events or HTTP contracts."
+"payment".msg = "Importing another service creates a distributed monolith (D7). Use events or HTTP contracts."
+"notification".msg = "Importing another service creates a distributed monolith (D7). Use events or HTTP contracts."
