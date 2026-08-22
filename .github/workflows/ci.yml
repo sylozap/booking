@@ -1,0 +1,100 @@
+name: CI
+
+# Trunk-based: every change reaches main through a pull request (D60).
+# Documentation-only changes do not build anything — the whole workflow is
+# skipped for them. Note that with required status checks this means a
+# docs-only pull request reports no checks rather than green ones.
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+      - 'LICENSE'
+  pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+      - 'LICENSE'
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # Per-path triggers for the monorepo (D60). The chassis and the workspace
+  # files fan out to every service, since a change there can break any of them.
+  # The outputs are consumed by the per-service build jobs added in P1-T28.
+  changes:
+    name: Detect changed components
+    runs-on: ubuntu-latest
+    outputs:
+      chassis: ${{ steps.filter.outputs.chassis }}
+      identity: ${{ steps.filter.outputs.identity }}
+      catalog: ${{ steps.filter.outputs.catalog }}
+      booking: ${{ steps.filter.outputs.booking }}
+      payment: ${{ steps.filter.outputs.payment }}
+      notification: ${{ steps.filter.outputs.notification }}
+      changed: ${{ steps.filter.outputs.changes }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            workspace: &workspace
+              - 'pyproject.toml'
+              - 'uv.lock'
+              - '.github/workflows/ci.yml'
+            chassis: &chassis
+              - *workspace
+              - 'libs/chassis/**'
+            identity:
+              - *chassis
+              - 'services/identity/**'
+            catalog:
+              - *chassis
+              - 'services/catalog/**'
+            booking:
+              - *chassis
+              - 'services/booking/**'
+            payment:
+              - *chassis
+              - 'services/payment/**'
+            notification:
+              - *chassis
+              - 'services/notification/**'
+
+      - name: Report changed components
+        run: |
+          echo "Changed components: ${{ steps.filter.outputs.changes }}" >> "$GITHUB_STEP_SUMMARY"
+
+  quality:
+    name: Lint, typecheck and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Install workspace
+        run: uv sync --locked
+
+      - name: Lint
+        run: uv run ruff check --output-format=github .
+
+      - name: Check formatting
+        run: uv run ruff format --check .
+
+      - name: Typecheck
+        run: uv run mypy
+
+      - name: Test
+        run: uv run pytest
