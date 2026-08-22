@@ -37,3 +37,97 @@ catalog = { workspace = true }
 booking = { workspace = true }
 payment = { workspace = true }
 notification = { workspace = true }
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["libs/chassis/src", "services/*/src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "A",     # builtins shadowing
+    "ANN",   # missing annotations (CODING_STANDARDS 4)
+    "ARG",   # unused arguments
+    "ASYNC", # blocking calls in coroutines (CODING_STANDARDS 13)
+    "B",     # bugbear
+    "BLE",   # blind except (CODING_STANDARDS 11)
+    "C4",    # comprehensions
+    "DTZ",   # naive datetime (D13)
+    "E",     # pycodestyle errors
+    "ERA",   # commented-out code
+    "F",     # pyflakes
+    "FBT",   # boolean trap
+    "I",     # import sorting
+    "INP",   # implicit namespace packages
+    "N",     # naming (CODING_STANDARDS 3)
+    "PL",    # pylint
+    "PT",    # pytest style
+    "PTH",   # pathlib over os.path
+    "Q",     # quotes
+    "RET",   # return simplification
+    "RUF",   # ruff-specific
+    "S",     # bandit
+    "SIM",   # simplification
+    "T20",   # print (CODING_STANDARDS 11)
+    "TD",    # TODO hygiene
+    "TID",   # import discipline (CODING_STANDARDS 2.2)
+    "TRY",   # exception handling
+    "UP",    # pyupgrade
+    "W",     # pycodestyle warnings
+]
+ignore = [
+    "TD002",  # TODO author is redundant: git blame already records it.
+    "TRY003", # Message text at the raise site is more readable than a message class.
+]
+
+[tool.ruff.lint.flake8-tidy-imports]
+# Absolute imports only: the layer a symbol comes from must be visible in the
+# import line itself (CODING_STANDARDS 1, 2.2).
+ban-relative-imports = "all"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+    "PLR2004", # Literal expected values are the point of a test.
+    "S101",    # assert is how tests assert.
+]
+"**/tests/**/*.py" = [
+    "PLR2004",
+    "S101",
+]
+"**/migrations/**/*.py" = [
+    "ANN",   # Alembic revision templates are generated.
+    "INP001",
+]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+# CODING_STANDARDS 4: `Any` is banned; use `object` plus explicit narrowing.
+disallow_any_explicit = true
+disallow_any_unimported = true
+enable_error_code = [
+    "explicit-override",
+    "ignore-without-code",
+    "possibly-undefined",
+    "redundant-expr",
+    "truthy-bool",
+    "unused-awaitable",
+]
+namespace_packages = true
+explicit_package_bases = true
+mypy_path = [
+    "libs/chassis/src",
+    "services/booking/src",
+    "services/catalog/src",
+    "services/identity/src",
+    "services/notification/src",
+    "services/payment/src",
+]
+files = ["libs", "services", "tests"]
+
+[tool.pytest.ini_options]
+addopts = "-q --strict-markers --strict-config"
+testpaths = ["tests", "libs", "services"]
+asyncio_mode = "strict"
+asyncio_default_fixture_loop_scope = "function"

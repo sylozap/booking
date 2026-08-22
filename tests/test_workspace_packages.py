@@ -15,6 +15,8 @@ from pathlib import Path
 
 import pytest
 
+import chassis
+
 REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
 
 SERVICE_PACKAGES = ("identity", "catalog", "booking", "payment", "notification")
@@ -69,6 +71,4 @@ def test_chassis_is_importable_from_every_service(service_package: str) -> None:
 
 def test_chassis_exposes_no_domain_types() -> None:
     # D7: the chassis carries infrastructure only. It is empty until phase 2.
-    import chassis
-
     assert chassis.__all__ == []
