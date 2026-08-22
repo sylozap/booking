@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.Python
+build/
+dist/
+
+# Environments
+.venv/
+venv/
+
+# Tooling caches
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Configuration and secrets.
+# Encrypted SOPS files are committed; age private keys never are (D52).
+.env
+.env.*
+!.env.example
+*.agekey
+age.key
+keys.txt
+
+# Local infrastructure state
+deploy/local/data/
+
+# Editors
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
