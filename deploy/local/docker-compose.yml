@@ -195,10 +195,72 @@ services:
       start_period: 15s
     restart: unless-stopped
 
+  # --- auxiliary services --------------------------------------------------
+
+  # SMTP sink. notification delivers real email over SMTP; locally it lands
+  # here instead of in someone's inbox.
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    ports:
+      - "${MAILHOG_SMTP_HOST_PORT:-1025}:1025"
+      - "${MAILHOG_UI_HOST_PORT:-8025}:8025"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8025/api/v2/messages?limit=1"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 5s
+    restart: unless-stopped
+
+  # S3-compatible storage for the WAL archive. CloudNativePG streams WAL here,
+  # which is what makes point-in-time recovery — and a restore drill — possible
+  # (D56).
+  minio:
+    image: minio/minio:RELEASE.2024-11-07T00-52-20Z
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_UPDATE: "off"
+    volumes:
+      - minio-data:/data
+    ports:
+      - "${MINIO_API_HOST_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_HOST_PORT:-9001}:9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+
+  # One-shot: creates the backup bucket and exits. Idempotent, so `make up` on
+  # an existing volume is a no-op rather than an error.
+  #
+  # Behind a profile, so it is not part of the default set: `up --wait` treats
+  # any container that exits — including one that exits 0 because its job is
+  # done — as a failed start. `make up` runs it explicitly instead.
+  minio-init:
+    profiles: [init]
+    image: minio/mc:RELEASE.2024-11-21T17-21-54Z
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint:
+      - sh
+      - -c
+      - |
+        mc alias set local http://minio:9000 minioadmin minioadmin
+        mc mb --ignore-existing local/postgres-backups
+        mc ls local
+    restart: "no"
+
 volumes:
   grafana-data:
   kafka-data:
   loki-data:
+  minio-data:
   postgres-data:
   prometheus-data:
   tempo-data:
