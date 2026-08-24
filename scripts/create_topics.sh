@@ -3,6 +3,7 @@
 #
 #   scripts/create_topics.sh apply    create missing topics, align configs
 #   scripts/create_topics.sh verify   assert the broker matches this file
+#   scripts/create_topics.sh list     print the declared topic names
 #
 # Topics are per aggregate, not per event type (ADR-0011). Partition key is
 # specialist_id, which orders events for one specialist while keeping different
@@ -136,11 +137,20 @@ verify() {
     echo "topics: all ${#TOPICS[@]} topics match the declaration"
 }
 
+# The declaration, without touching the broker. Other scripts read the topic
+# names from here rather than keeping a second copy of the list.
+list() {
+    for spec in "${TOPICS[@]}"; do
+        printf '%s\n' "${spec%%:*}"
+    done
+}
+
 case "${1:-apply}" in
     apply)  apply ;;
     verify) verify ;;
+    list)   list ;;
     *)
-        echo "usage: $(basename "$0") [apply|verify]" >&2
+        echo "usage: $(basename "$0") [apply|verify|list]" >&2
         exit 2
         ;;
 esac

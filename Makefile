@@ -50,21 +50,32 @@ ci: lint typecheck test ## Run every check the pipeline runs
 
 # --- local infrastructure --------------------------------------------------
 
+# Containers first, then the state they must hold: a broker with no topics
+# passes its healthcheck and fails the first consumer. The target returns only
+# once every component answers a real readiness probe.
 .PHONY: up
 up: ## Start the local infrastructure stack and wait until it is ready
-	@if [[ ! -f "$(COMPOSE_FILE)" ]]; then \
-		echo "skip: $(COMPOSE_FILE) does not exist yet; it arrives with P0-T06."; \
-	else \
-		$(COMPOSE) up --detach --wait; \
-	fi
+	$(COMPOSE) up --detach --wait
+	@echo
+	@echo "==> buckets"
+	@$(COMPOSE) run --rm --quiet-pull minio-init
+	@echo
+	@echo "==> topics"
+	@scripts/create_topics.sh apply
+	@echo
+	@scripts/wait_for_stack.sh
 
 .PHONY: down
 down: ## Stop the local infrastructure stack
-	@if [[ ! -f "$(COMPOSE_FILE)" ]]; then \
-		echo "skip: $(COMPOSE_FILE) does not exist yet; it arrives with P0-T06."; \
-	else \
-		$(COMPOSE) down --remove-orphans; \
-	fi
+	$(COMPOSE) down --remove-orphans
+
+.PHONY: ready
+ready: ## Check that every component of the running stack is ready
+	@scripts/wait_for_stack.sh
+
+.PHONY: topics
+topics: ## Create the Kafka topics and align their configuration
+	@scripts/create_topics.sh apply
 
 # --- databases -------------------------------------------------------------
 
