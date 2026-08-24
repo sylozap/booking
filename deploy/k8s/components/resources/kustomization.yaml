@@ -1,0 +1,10 @@
+# Requests and limits for every workload. Without a request the scheduler
+# treats the pod as free and packs the node until something is evicted; the
+# environment-specific numbers live in the overlays.
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+
+patches:
+  - path: resources.yaml
+    target:
+      kind: Deployment

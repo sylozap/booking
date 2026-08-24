@@ -1,0 +1,22 @@
+# dev: one replica per service, image tags follow whatever CI last committed
+# (D60). Everything that differs between environments differs here, so the
+# base never learns that environments exist.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: dev
+
+resources:
+  - ../../base
+
+components:
+  - ../../components/probes
+  - ../../components/resources
+
+labels:
+  - includeSelectors: false
+    pairs:
+      booking.dev/environment: dev
+
+# Verbose logging and single replicas are dev defaults; both are set
+# here once there is a workload to set them on.

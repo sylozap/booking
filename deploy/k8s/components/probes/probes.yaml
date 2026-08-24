@@ -1,0 +1,34 @@
+# Applied to every container of every Deployment: the patch targets the
+# container list by position, which is what a strategic merge on an unnamed
+# container cannot do, so the name is a placeholder replaced per workload.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: placeholder
+spec:
+  template:
+    spec:
+      containers:
+        - name: app
+          startupProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            periodSeconds: 3
+            # Migrations run as a PreSync job, so a slow start here is the
+            # process itself, not schema work.
+            failureThreshold: 20
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2

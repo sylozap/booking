@@ -1,0 +1,17 @@
+# The application set is empty on purpose: the first service arrives with
+# P1-T30. Everything below is what every service will inherit, so adding one
+# means adding a directory here and nothing else.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources: []
+
+# Identity labels, not selectors. Kustomize propagates a label into a
+# Deployment's selector when includeSelectors is on, and a selector is
+# immutable after creation — an environment label there would make the label
+# impossible to change later without deleting the workload.
+labels:
+  - includeSelectors: false
+    pairs:
+      app.kubernetes.io/part-of: booking
+      app.kubernetes.io/managed-by: kustomize

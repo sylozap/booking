@@ -73,6 +73,23 @@ jobs:
         run: |
           echo "Changed components: ${{ steps.filter.outputs.changes }}" >> "$GITHUB_STEP_SUMMARY"
 
+  # Kustomize builds locally and in the pipeline the same way, so a manifest
+  # that only builds on the developer's machine fails here instead of in
+  # ArgoCD, where the failure surfaces as an out-of-sync application (D51).
+  manifests:
+    name: Build overlays
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install kustomize
+        run: |
+          scripts/install_tools.sh install kustomize
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Build overlays
+        run: make manifests
+
   quality:
     name: Lint, typecheck and test
     runs-on: ubuntu-latest

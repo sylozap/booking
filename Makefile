@@ -6,6 +6,7 @@ SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
 SERVICES     := identity catalog booking payment notification
+OVERLAYS     := dev prod
 COMPOSE_FILE := deploy/local/docker-compose.yml
 COMPOSE      := docker compose -f $(COMPOSE_FILE)
 UV           := uv run
@@ -92,6 +93,13 @@ cluster-up: ## Create the kind cluster with an Ingress controller
 .PHONY: cluster-down
 cluster-down: ## Delete the kind cluster
 	kind delete cluster --name $(CLUSTER_NAME)
+
+.PHONY: manifests
+manifests: ## Build every overlay
+	@for overlay in $(OVERLAYS); do \
+		echo "==> $$overlay"; \
+		kustomize build "deploy/k8s/overlays/$$overlay" || exit 1; \
+	done
 
 # --- databases -------------------------------------------------------------
 

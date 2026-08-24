@@ -1,0 +1,22 @@
+# prod: the same manifests as dev, with the differences that matter — replica
+# count and, later, tighter resources. It is a namespace of the same cluster
+# (D58), so it must not assume hardware dev does not have.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: prod
+
+resources:
+  - ../../base
+
+components:
+  - ../../components/probes
+  - ../../components/resources
+
+labels:
+  - includeSelectors: false
+    pairs:
+      booking.dev/environment: prod
+
+# Replica counts and tighter resources are set here once there is a
+# workload to set them on.

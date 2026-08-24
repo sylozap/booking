@@ -1,0 +1,14 @@
+# Liveness and readiness mean different things and must not be the same probe:
+# a service that cannot reach its database is not ready to take traffic, but
+# restarting it will not bring the database back (ADR-0012). /health/live
+# answers as long as the process is sane; /health/ready checks dependencies.
+#
+# A Component rather than a base: it carries no resources of its own, only the
+# patch every workload gets.
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+
+patches:
+  - path: probes.yaml
+    target:
+      kind: Deployment
