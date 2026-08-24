@@ -1,0 +1,18 @@
+# Two environments in one cluster, separated by namespace (D58). They exist
+# before any application does: an overlay declares which namespace it targets
+# and must not be the thing that creates it.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dev
+  labels:
+    app.kubernetes.io/part-of: booking
+    booking.dev/environment: dev
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: prod
+  labels:
+    app.kubernetes.io/part-of: booking
+    booking.dev/environment: prod

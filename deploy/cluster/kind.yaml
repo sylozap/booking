@@ -1,0 +1,29 @@
+# Local cluster (D10). One node: dev and prod are namespaces of this cluster,
+# not clusters of their own (D58), so there is nothing a second node would
+# isolate — it would only cost memory the observability stack already wants.
+#
+# The node image is pinned. A cluster that silently changes Kubernetes version
+# between two `make cluster-up` runs is not a reproducible environment.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: booking
+
+nodes:
+  - role: control-plane
+    kubeadmConfigPatches:
+      # ingress-nginx schedules onto the node carrying this label, and the
+      # kind provider manifest also tolerates the control-plane taint.
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "ingress-ready=true"
+    extraPortMappings:
+      # Published on the host so an Ingress is reachable from the browser
+      # without a port-forward.
+      - containerPort: 80
+        hostPort: 80
+        protocol: TCP
+      - containerPort: 443
+        hostPort: 443
+        protocol: TCP

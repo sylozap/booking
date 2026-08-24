@@ -9,6 +9,8 @@ SERVICES     := identity catalog booking payment notification
 COMPOSE_FILE := deploy/local/docker-compose.yml
 COMPOSE      := docker compose -f $(COMPOSE_FILE)
 UV           := uv run
+CLUSTER_NAME := booking
+KUBE_CONTEXT := kind-$(CLUSTER_NAME)
 
 .PHONY: help
 help: ## Show available targets
@@ -82,6 +84,14 @@ topics: ## Create the Kafka topics and align their configuration
 .PHONY: tools
 tools: ## Install the pinned cluster toolchain into ~/.local/bin
 	@scripts/install_tools.sh
+
+.PHONY: cluster-up
+cluster-up: ## Create the kind cluster with an Ingress controller
+	@scripts/cluster_up.sh
+
+.PHONY: cluster-down
+cluster-down: ## Delete the kind cluster
+	kind delete cluster --name $(CLUSTER_NAME)
 
 # --- databases -------------------------------------------------------------
 
