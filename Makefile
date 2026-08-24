@@ -13,7 +13,7 @@ UV           := uv run
 .PHONY: help
 help: ## Show available targets
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
-		| awk -F':.*?## ' '{printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
+		| awk -F':.*?## ' '{printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
 
 # --- environment -----------------------------------------------------------
 
@@ -76,6 +76,12 @@ ready: ## Check that every component of the running stack is ready
 .PHONY: topics
 topics: ## Create the Kafka topics and align their configuration
 	@scripts/create_topics.sh apply
+
+# --- cluster ---------------------------------------------------------------
+
+.PHONY: tools
+tools: ## Install the pinned cluster toolchain into ~/.local/bin
+	@scripts/install_tools.sh
 
 # --- databases -------------------------------------------------------------
 
