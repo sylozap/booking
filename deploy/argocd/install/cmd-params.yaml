@@ -1,0 +1,11 @@
+# Local cluster: the API server sits behind a port-forward, and terminating
+# TLS twice buys nothing here. In a real deployment this is the one patch that
+# would go away.
+apiVersion: v1
+kind: ConfigMap
+# No namespace here on purpose: the kustomization sets it after patching, so
+# a namespace in the patch would not match the upstream object.
+metadata:
+  name: argocd-cmd-params-cm
+data:
+  server.insecure: "true"

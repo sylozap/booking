@@ -1,0 +1,30 @@
+# One project for everything this repository deploys. It exists to bound what
+# a compromised or mistaken Application can do: only this repository as a
+# source, only dev and prod as destinations.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: booking
+  namespace: argocd
+spec:
+  description: Booking platform services
+
+  sourceRepos:
+    - '*'
+
+  destinations:
+    - namespace: dev
+      server: https://kubernetes.default.svc
+    - namespace: prod
+      server: https://kubernetes.default.svc
+    # The root Application and the ones it generates live here.
+    - namespace: argocd
+      server: https://kubernetes.default.svc
+
+  # Applications never create namespaces or touch cluster-wide objects: the
+  # namespaces are part of the cluster bootstrap (deploy/cluster/namespaces.yaml).
+  clusterResourceWhitelist: []
+
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'

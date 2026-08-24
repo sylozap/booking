@@ -1,0 +1,59 @@
+# Secrets are committed encrypted and must arrive in the cluster decrypted
+# (D52). The decryption has to happen wherever manifests are rendered, which
+# for ArgoCD is the repo-server — hence KSOPS, a kustomize exec plugin, and
+# the age private key mounted from a Secret that is created out of band and
+# never lives in the repository.
+#
+# Getting the plugin binary in is more roundabout than the upstream
+# documentation suggests, for two reasons: the KSOPS image no longer ships a
+# shell, so it cannot copy anything out of itself, and an image volume can
+# only expose a directory, not a single file. So the KSOPS image is mounted as
+# a directory into an init container that does have a shell — the ArgoCD image
+# itself, already pulled for this pod — which copies the one binary into an
+# emptyDir the repo-server mounts at the path kustomize looks for it.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: argocd-repo-server
+spec:
+  template:
+    spec:
+      volumes:
+        - name: ksops-image
+          image:
+            reference: viaductoss/ksops:v4.5.1
+            pullPolicy: IfNotPresent
+        - name: custom-tools
+          emptyDir: {}
+        - name: sops-age
+          secret:
+            secretName: sops-age
+      initContainers:
+        - name: install-ksops
+          image: quay.io/argoproj/argocd:v3.5.1
+          command: ["/bin/sh", "-c", "cp /ksops-image/ksops /custom-tools/ksops"]
+          volumeMounts:
+            - name: ksops-image
+              mountPath: /ksops-image
+              subPath: usr/local/bin
+            - name: custom-tools
+              mountPath: /custom-tools
+      containers:
+        - name: argocd-repo-server
+          env:
+            # sops looks for the key relative to XDG_CONFIG_HOME; the explicit
+            # file path is set too, because the two are read by different code
+            # paths depending on how kustomize invokes the plugin.
+            - name: XDG_CONFIG_HOME
+              value: /.config
+            - name: SOPS_AGE_KEY_FILE
+              value: /.config/sops/age/keys.txt
+          volumeMounts:
+            # Only the plugin is added; kustomize stays the one ArgoCD ships,
+            # so the rendering behaviour is ArgoCD's own everywhere else.
+            - name: custom-tools
+              mountPath: /usr/local/bin/ksops
+              subPath: ksops
+            - name: sops-age
+              mountPath: /.config/sops/age
+              readOnly: true

@@ -1,0 +1,29 @@
+# ArgoCD itself is installed with kubectl, not managed by ArgoCD: something
+# has to apply the first manifest, and a GitOps controller cannot bootstrap
+# itself from a cluster it is not yet running in (D10).
+#
+# The upstream install manifest is referenced by tag, not vendored: it is
+# ~20k lines that would drown every future diff in this directory, and the tag
+# pins it as firmly as a copy would.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: argocd
+
+resources:
+  - https://raw.githubusercontent.com/argoproj/argo-cd/v3.5.1/manifests/install.yaml
+
+patches:
+  - path: repo-server-ksops.yaml
+  - path: cmd-params.yaml
+
+configMapGenerator:
+  # Kustomize refuses to run an exec plugin such as KSOPS unless it is told to,
+  # and ArgoCD passes these flags to every kustomize build it performs (D52).
+  - name: argocd-cm
+    behavior: merge
+    literals:
+      - kustomize.buildOptions=--enable-alpha-plugins --enable-exec
+
+generatorOptions:
+  disableNameSuffixHash: true

@@ -1,0 +1,40 @@
+# App of apps. This is the only Application applied by hand; everything else
+# arrives because this one points at a directory in the repository, so adding
+# a service means committing a file to deploy/argocd/apps/ (D10).
+#
+# ${GIT_REPO_URL} is substituted by scripts/argocd_up.sh from the repository's
+# origin remote. Bootstrap manifests are applied by a human, in the same
+# category as installing ArgoCD itself — the child Applications this one
+# generates carry the URL literally instead, because ArgoCD reads those from
+# git and nothing substitutes anything there.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root
+  namespace: argocd
+  # Without this the Application object is deleted before the applications it
+  # owns, leaving them orphaned in the cluster.
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: booking
+
+  source:
+    repoURL: ${GIT_REPO_URL}
+    targetRevision: main
+    path: deploy/argocd/apps
+    directory:
+      recurse: true
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+
+  syncPolicy:
+    automated:
+      # An application removed from the directory must disappear from the
+      # cluster; without prune the repository stops being the whole truth.
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

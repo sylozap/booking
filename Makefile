@@ -12,6 +12,7 @@ COMPOSE      := docker compose -f $(COMPOSE_FILE)
 UV           := uv run
 CLUSTER_NAME := booking
 KUBE_CONTEXT := kind-$(CLUSTER_NAME)
+KUBECTL      := kubectl --context $(KUBE_CONTEXT)
 
 .PHONY: help
 help: ## Show available targets
@@ -100,6 +101,21 @@ manifests: ## Build every overlay
 		echo "==> $$overlay"; \
 		kustomize build "deploy/k8s/overlays/$$overlay" || exit 1; \
 	done
+
+# --- gitops ----------------------------------------------------------------
+
+.PHONY: argocd-up
+argocd-up: ## Install ArgoCD and apply the root application
+	@scripts/argocd_up.sh
+
+.PHONY: argocd-ui
+argocd-ui: ## Forward the ArgoCD UI to http://localhost:8080
+	$(KUBECTL) --namespace argocd port-forward service/argocd-server 8080:80
+
+.PHONY: argocd-password
+argocd-password: ## Print the initial ArgoCD admin password
+	@$(KUBECTL) --namespace argocd get secret argocd-initial-admin-secret \
+		--output jsonpath='{.data.password}' | base64 --decode; echo
 
 # --- databases -------------------------------------------------------------
 
