@@ -13,6 +13,7 @@ UV           := uv run
 CLUSTER_NAME := booking
 KUBE_CONTEXT := kind-$(CLUSTER_NAME)
 KUBECTL      := kubectl --context $(KUBE_CONTEXT)
+AGE_KEY_FILE := $(HOME)/.config/sops/age/keys.txt
 
 .PHONY: help
 help: ## Show available targets
@@ -116,6 +117,40 @@ argocd-ui: ## Forward the ArgoCD UI to http://localhost:8080
 argocd-password: ## Print the initial ArgoCD admin password
 	@$(KUBECTL) --namespace argocd get secret argocd-initial-admin-secret \
 		--output jsonpath='{.data.password}' | base64 --decode; echo
+
+# --- secrets ---------------------------------------------------------------
+
+# The private key lives outside the repository and is the one thing here that
+# cannot be recreated from it (D52). See docs/RUNBOOK.md.
+.PHONY: secrets-key
+secrets-key: ## Generate the age key if it does not exist
+	@if [[ -f "$(AGE_KEY_FILE)" ]]; then \
+		echo "age key already exists at $(AGE_KEY_FILE)"; \
+	else \
+		mkdir -p "$$(dirname "$(AGE_KEY_FILE)")"; \
+		age-keygen --output "$(AGE_KEY_FILE)" >/dev/null 2>&1; \
+		chmod 600 "$(AGE_KEY_FILE)"; \
+		echo "created $(AGE_KEY_FILE); put the public key below into .sops.yaml"; \
+	fi
+	@echo "public key: $$(age-keygen -y "$(AGE_KEY_FILE)")"
+
+.PHONY: secrets-push
+secrets-push: ## Load the age key into the cluster for ArgoCD to decrypt with
+	@$(KUBECTL) --namespace argocd create secret generic sops-age \
+		--from-file="keys.txt=$(AGE_KEY_FILE)" \
+		--dry-run=client --output=yaml | $(KUBECTL) apply --filename -
+
+.PHONY: secrets-edit
+secrets-edit: ## Decrypt, edit and re-encrypt: make secrets-edit FILE=path
+	@if [[ -z "$(FILE)" ]]; then \
+		echo "usage: make secrets-edit FILE=deploy/k8s/base/secrets/<name>.enc.yaml"; \
+		exit 2; \
+	fi
+	sops "$(FILE)"
+
+.PHONY: secrets-build
+secrets-build: ## Render the encrypted secrets locally (needs the age key)
+	@kustomize build --enable-alpha-plugins --enable-exec deploy/k8s/base/secrets
 
 # --- databases -------------------------------------------------------------
 

@@ -26,6 +26,8 @@ htmlcov/
 *.agekey
 age.key
 keys.txt
+# A decrypted copy of an encrypted manifest, if one is ever written to disk.
+*.dec.yaml
 
 # Local infrastructure state
 deploy/local/data/

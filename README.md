@@ -16,6 +16,7 @@ SaaS-платформа онлайн-бронирования времени с�
 | [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) | 130 задач: зависимости, файлы, критерии приёмки, тесты |
 | [docs/DECISIONS.md](docs/DECISIONS.md) | Реестр решений D1–D31 со ссылками на обоснования |
 | [docs/CODING_STANDARDS.md](docs/CODING_STANDARDS.md) | Соглашения по написанию кода, чек-лист ревью, запреты |
+| [docs/RUNBOOK.md](docs/RUNBOOK.md) | Эксплуатационные процедуры: ключ age и секреты SOPS |
 | [docs/adr/](docs/adr/) | Architecture Decision Records — почему принято именно так |
 
 ## Ключевые ограничения проекта

@@ -1,0 +1,13 @@
+# Which files are encrypted, with whose key, and which parts of them (D52).
+#
+# The private key lives at ~/.config/sops/age/keys.txt and never enters the
+# repository; losing it makes every file below unreadable. The recovery
+# procedure is in docs/RUNBOOK.md.
+#
+# Only the values are encrypted: encrypted_regex leaves keys, names and
+# metadata in clear text, so a diff still shows which secret changed and a
+# reviewer can see that a manifest is well-formed without holding the key.
+creation_rules:
+  - path_regex: \.enc\.yaml$
+    encrypted_regex: ^(data|stringData)$
+    age: age18rtx2mhf3s8ny533jnt95pqe4ncn0skpj2g0np8uqfwkh6dlas6sfkdrex
