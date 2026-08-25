@@ -33,9 +33,10 @@ hooks: sync ## Install git hooks (pre-commit and commit-msg)
 # --- quality ---------------------------------------------------------------
 
 .PHONY: lint
-lint: ## Run ruff lint and format checks
+lint: ## Run ruff lint, format and layer-boundary checks
 	$(UV) ruff check .
 	$(UV) ruff format --check .
+	$(UV) lint-imports
 
 .PHONY: format
 format: ## Apply ruff fixes and formatting

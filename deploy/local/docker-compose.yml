@@ -120,6 +120,10 @@ services:
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
+    extra_hosts:
+      # Linux has no host.docker.internal by default; without it Prometheus
+      # cannot reach a service running outside the compose network.
+      - "host.docker.internal:host-gateway"
     ports:
       - "${PROMETHEUS_HOST_PORT:-9090}:9090"
     healthcheck:

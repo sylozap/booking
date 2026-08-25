@@ -17,6 +17,9 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "httpx>=0.28",         # ASGI transport for the FastAPI test client
+    "httpx2>=2.12",        # what starlette's test client uses; without it every run warns
+    "import-linter>=2.1",  # layer boundaries (CODING_STANDARDS 2.2)
     "mypy>=1.13",
     "pre-commit>=4.0",
     "pytest>=8.3",
@@ -41,7 +44,7 @@ notification = { workspace = true }
 [tool.ruff]
 target-version = "py312"
 line-length = 100
-src = ["libs/chassis/src", "services/*/src", "tests"]
+src = ["libs/chassis/src", "services/*/src", "services/*/tests", "tests"]
 
 [tool.ruff.lint]
 select = [
@@ -93,6 +96,16 @@ ban-relative-imports = "all"
 "**/tests/**/*.py" = [
     "PLR2004",
     "S101",
+    # A service's tests are a test root, not a package. Adding __init__.py
+    # would name every service's suite `tests`, and two of them cannot be
+    # imported into the same run.
+    "INP001",
+]
+"**/domain/exceptions.py" = [
+    # CODING_STANDARDS 6 names a domain error after the rule it violates
+    # (SlotAlreadyTaken), not with an Error suffix: the catalogue reads as a
+    # list of things that can go wrong, which is what it is.
+    "N818",
 ]
 "**/migrations/**/*.py" = [
     "ANN",   # Alembic revision templates are generated.
@@ -125,6 +138,49 @@ mypy_path = [
     "services/payment/src",
 ]
 files = ["libs", "services", "tests"]
+
+# CODING_STANDARDS 2.2: the layer rules are checked by a linter, not by
+# agreement. Every contract here restates one row of that table.
+[tool.importlinter]
+root_packages = ["identity", "catalog", "booking", "payment", "notification", "chassis"]
+# Required to name third-party packages in a forbidden contract.
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "identity: dependencies point inward"
+type = "layers"
+# api and infrastructure are siblings, not stacked: api reaches infrastructure
+# only through a port declared in application, and the composition root
+# (identity.main, deliberately outside every layer) is what connects them.
+layers = [
+    "identity.api | identity.infrastructure",
+    "identity.application",
+    "identity.domain",
+]
+
+[[tool.importlinter.contracts]]
+name = "identity: domain knows nothing of infrastructure"
+type = "forbidden"
+source_modules = ["identity.domain"]
+# The point of the rule is that domain tests need no database, no broker and no
+# network. A pydantic import in domain is the first step to a validator that
+# needs one.
+forbidden_modules = [
+    "fastapi",
+    "starlette",
+    "pydantic",
+    "pydantic_settings",
+    "sqlalchemy",
+    "redis",
+    "opentelemetry",
+    "prometheus_client",
+]
+
+[[tool.importlinter.contracts]]
+name = "services never import each other"
+type = "independence"
+# D7: between services there are events and HTTP contracts, nothing else.
+modules = ["identity", "catalog", "booking", "payment", "notification"]
 
 [tool.pytest.ini_options]
 addopts = "-q --strict-markers --strict-config"

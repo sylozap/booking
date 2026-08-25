@@ -11,8 +11,8 @@ scrape_configs:
     static_configs:
       - targets: ['localhost:9090']
 
-  # Service metrics reach Prometheus through the collector, not by scraping
-  # each service directly.
+  # The collector's own metrics — refused spans, queue depth — matter as much
+  # as the services'.
   - job_name: otel-collector
     static_configs:
       - targets: ['otel-collector:8889']
@@ -20,3 +20,18 @@ scrape_configs:
   - job_name: otel-collector-internal
     static_configs:
       - targets: ['otel-collector:8888']
+
+  # Services expose /metrics and are scraped directly, while traces and logs
+  # are pushed to the collector. Metrics are the one signal where pull earns
+  # its keep: a target that stops answering is itself the signal, whereas a
+  # service that stops pushing looks the same as one with nothing to say.
+  #
+  # Running a service from the IDE means it listens on the host, not in this
+  # network, which is what host.docker.internal resolves to. In the cluster the
+  # same job is a pod discovery rule instead.
+  - job_name: services
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['host.docker.internal:8000']
+        labels:
+          service: identity

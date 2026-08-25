@@ -12,7 +12,7 @@ spec:
         - name: app
           startupProbe:
             httpGet:
-              path: /health/live
+              path: /healthz
               port: http
             periodSeconds: 3
             # Migrations run as a PreSync job, so a slow start here is the
@@ -20,14 +20,14 @@ spec:
             failureThreshold: 20
           livenessProbe:
             httpGet:
-              path: /health/live
+              path: /healthz
               port: http
             periodSeconds: 10
             timeoutSeconds: 3
             failureThreshold: 3
           readinessProbe:
             httpGet:
-              path: /health/ready
+              path: /readyz
               port: http
             periodSeconds: 5
             timeoutSeconds: 3
