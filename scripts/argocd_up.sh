@@ -36,7 +36,28 @@ if [[ ! -f "${AGE_KEY_FILE}" ]]; then
     exit 1
 fi
 
+# The developer pushes over ssh with a personal key; ArgoCD reads a public
+# repository anonymously over https and holds no credentials at all. Same
+# repository, two access paths, so the ssh form of origin is rewritten rather
+# than handed to the cluster — a key that can write to every repository on the
+# account has no business inside a pod. A private repository would instead get
+# its own read-only deploy key in an ArgoCD repository Secret.
+normalise_repo_url() {
+    local url="$1" rest
+    case "${url}" in
+        git@*:*)
+            rest="${url#git@}"
+            # scp-style: the colon separates host from path, and only the
+            # first one does — a path may legitimately contain more.
+            printf 'https://%s' "${rest/://}"
+            ;;
+        ssh://git@*) printf 'https://%s' "${url#ssh://git@}" ;;
+        *) printf '%s' "${url}" ;;
+    esac
+}
+
 GIT_REPO_URL="${GIT_REPO_URL:-$(git -C "${REPO_ROOT}" remote get-url origin 2>/dev/null || true)}"
+GIT_REPO_URL="$(normalise_repo_url "${GIT_REPO_URL}")"
 if [[ -z "${GIT_REPO_URL}" ]]; then
     cat >&2 <<'MESSAGE'
 no git remote to deploy from.
