@@ -40,6 +40,18 @@ def build_settings(**overrides: object) -> Settings:
     return Settings(**values)  # type: ignore[arg-type]  # Keyword arguments are validated by pydantic.
 
 
+@pytest.fixture(autouse=True)
+def ignore_developer_env_file(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep services/identity/.env out of the test suite.
+
+    The file is how a developer configures a local run, and it is exactly what
+    must not decide whether a test passes: without this, a machine that has one
+    would see the "missing variable terminates the process" tests succeed
+    because the variable is not missing at all.
+    """
+    monkeypatch.setitem(Settings.model_config, "env_file", None)
+
+
 @pytest.fixture(scope="session", autouse=True)
 def span_exporter() -> InMemorySpanExporter:
     """Capture spans in memory instead of shipping them at a collector.

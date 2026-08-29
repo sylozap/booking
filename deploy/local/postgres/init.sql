@@ -20,9 +20,11 @@ GRANT CONNECT, TEMPORARY ON DATABASE identity TO identity;
 
 REVOKE ALL ON SCHEMA public FROM PUBLIC;
 ALTER SCHEMA public OWNER TO identity;
--- users.email is citext: email comparison is case-insensitive by the column
--- type rather than by every query remembering to lower() it.
-CREATE EXTENSION IF NOT EXISTS citext;
+-- Extensions are NOT created here. Migration 0001 installs the ones identity
+-- needs, as the identity role, exactly as it does in the cluster. Creating one
+-- here as the superuser makes the local database subtly different: the service
+-- role does not own the extension and cannot drop it, so `alembic downgrade`
+-- fails on a developer machine and nowhere else.
 
 -- catalog -------------------------------------------------------------------
 
@@ -51,9 +53,8 @@ GRANT CONNECT, TEMPORARY ON DATABASE booking TO booking;
 
 REVOKE ALL ON SCHEMA public FROM PUBLIC;
 ALTER SCHEMA public OWNER TO booking;
--- btree_gist lets the no-double-booking EXCLUDE constraint mix an equality
--- operator on specialist_id with an overlap operator on time_range (D12).
-CREATE EXTENSION IF NOT EXISTS btree_gist;
+-- btree_gist, which the no-double-booking EXCLUDE constraint needs (D12), is
+-- installed by that service's own first migration for the same reason.
 
 -- payment -------------------------------------------------------------------
 

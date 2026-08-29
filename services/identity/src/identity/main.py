@@ -29,7 +29,8 @@ from identity.api.health import router as health_router
 from identity.api.router import api_v1_router
 from identity.infrastructure.cache import CacheProbe, create_client
 from identity.infrastructure.config import Settings, get_settings
-from identity.infrastructure.database import DatabaseProbe, create_engine
+from identity.infrastructure.db.engine import DatabaseProbe, create_engine
+from identity.infrastructure.db.session import create_session_factory
 from identity.infrastructure.logging import configure_logging
 from identity.infrastructure.metrics import (
     METRICS_PATH,
@@ -117,6 +118,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
 
     app.state.settings = settings
+    # Scenarios open their own unit of work from this factory; the engine and
+    # its pool stay owned by the application (CODING_STANDARDS 7).
+    app.state.session_factory = create_session_factory(engine)
     app.state.metrics_registry = registry
     app.state.readiness_probes = (DatabaseProbe(engine), CacheProbe(redis_client))
     app.state.readiness_timeout_seconds = settings.readiness_timeout_seconds

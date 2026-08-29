@@ -18,12 +18,21 @@ import os
 import sys
 from enum import StrEnum
 from functools import lru_cache
+from pathlib import Path
 from typing import Annotated, Final, NoReturn
 
 from pydantic import Field, PostgresDsn, RedisDsn, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ENV_PREFIX: Final = "IDENTITY_"
+
+# services/identity, resolved from this file rather than from the working
+# directory: `make migrate` runs from the service directory, `make seed` from
+# the repository root, and a container has neither. In an image the file is
+# absent and the whole mechanism is a no-op — real environments configure the
+# process through actual environment variables (D54), which win over it anyway.
+SERVICE_ROOT: Final = Path(__file__).resolve().parents[3]
+ENV_FILE: Final = SERVICE_ROOT / ".env"
 
 
 class Environment(StrEnum):
@@ -46,6 +55,8 @@ class Settings(BaseSettings):  # type: ignore[explicit-any]  # pydantic's base d
 
     model_config = SettingsConfigDict(
         env_prefix=ENV_PREFIX,
+        env_file=ENV_FILE,
+        env_file_encoding="utf-8",
         extra="forbid",
         frozen=True,
         case_sensitive=False,

@@ -1,9 +1,9 @@
 """Async SQLAlchemy engine and its readiness probe.
 
-Only the connection lives here for now; sessions, models and migrations arrive
-with P1-T08. What matters at this point is that the pool is created once at
-startup and disposed at shutdown, and that something can ask it whether the
-database is reachable.
+The pool is created once at startup and disposed at shutdown; sessions are
+opened from it per unit of work (see ``session.py``). Only async drivers are
+used — a blocking call inside a coroutine stalls the whole event loop, not just
+the request that made it (CODING_STANDARDS 13).
 """
 
 from __future__ import annotations
