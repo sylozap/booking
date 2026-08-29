@@ -110,6 +110,12 @@ jobs:
       - name: Check formatting
         run: uv run ruff format --check .
 
+      # The layer boundaries are a linter rule, not an agreement
+      # (CODING_STANDARDS 2.2). Running it only in `make lint` means a broken
+      # contract reaches main with a green pipeline.
+      - name: Check layer boundaries
+        run: uv run lint-imports
+
       - name: Typecheck
         run: uv run mypy
 
