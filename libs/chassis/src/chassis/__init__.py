@@ -1,11 +1,5 @@
-"""Service chassis: cross-cutting infrastructure shared by every service.
+"""Cross-cutting service infrastructure. Contains no domain types (D7)."""
 
-Scope is limited to infrastructure — logging, telemetry, configuration, error
-format, health endpoints, outbox and idempotent consumption. Domain models and
-DTOs of any service are forbidden here (ADR-0009, D7).
+from chassis.identifiers import uuid7, uuid7_timestamp_ms
 
-The chassis is extracted from ``identity`` in phase 2; this package is an empty
-skeleton until then.
-"""
-
-__all__: list[str] = []
+__all__ = ["uuid7", "uuid7_timestamp_ms"]

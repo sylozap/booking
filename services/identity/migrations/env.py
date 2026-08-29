@@ -13,9 +13,9 @@ next command can undo. Tests override it explicitly through
 service uses and the one whose behaviour must be exercised; ``run_sync`` bridges
 Alembic's synchronous migration context onto it.
 
-Autogenerate compares against ``Base.metadata``, which is populated as a side
-effect of importing the model modules. There are none yet; the import that
-registers them arrives with the first table.
+Autogenerate compares against ``Base.metadata``, so every model module has to be
+imported before it runs — hence the models import below, which looks unused and
+is not.
 """
 
 from __future__ import annotations
@@ -29,6 +29,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from sqlalchemy.pool import NullPool
 
 from identity.infrastructure.config import get_settings
+from identity.infrastructure.db import models  # noqa: F401  # registers the tables on Base.metadata
 from identity.infrastructure.db.base import Base
 
 config = context.config

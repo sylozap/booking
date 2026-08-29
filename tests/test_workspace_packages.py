@@ -15,8 +15,6 @@ from pathlib import Path
 
 import pytest
 
-import chassis
-
 REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
 
 SERVICE_PACKAGES = ("identity", "catalog", "booking", "payment", "notification")
@@ -69,6 +67,27 @@ def test_chassis_is_importable_from_every_service(service_package: str) -> None:
     assert completed.returncode == 0, completed.stderr
 
 
-def test_chassis_exposes_no_domain_types() -> None:
-    # D7: the chassis carries infrastructure only. It is empty until phase 2.
-    assert chassis.__all__ == []
+def test_chassis_pulls_in_no_service_package() -> None:
+    # D7: the chassis carries cross-cutting infrastructure and no domain. The
+    # check is what that actually forbids — a dependency on a service — rather
+    # than the chassis staying empty, which it stopped being the moment a
+    # second service needed the same UUID v7 generator.
+    #
+    # A subprocess, so the answer is what a fresh process sees and not what
+    # another test in this run happened to import first.
+    completed = subprocess.run(  # noqa: S603
+        [
+            sys.executable,
+            "-c",
+            "import chassis, sys;"
+            f"services = {SERVICE_PACKAGES!r};"
+            "print(sorted(m for m in sys.modules if m.split('.')[0] in services))",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=60,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert completed.stdout.strip() == "[]"
