@@ -36,6 +36,7 @@ EXPECTED_TABLES: frozenset[str] = frozenset(
         "roles",
         "role_permissions",
         "user_roles",
+        "refresh_tokens",
     }
 )
 

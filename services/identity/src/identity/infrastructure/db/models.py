@@ -25,6 +25,7 @@ import uuid
 from typing import Final
 
 from sqlalchemy import (
+    CheckConstraint,
     Enum,
     ForeignKey,
     Index,
@@ -33,7 +34,7 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
-from sqlalchemy.dialects.postgresql import CITEXT
+from sqlalchemy.dialects.postgresql import CITEXT, INET
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from chassis import uuid7
@@ -209,4 +210,46 @@ class UserRole(Base):
         # The hot path: "what may this user do in this organization", asked on
         # every token issue.
         Index("ix_user_roles_user_id_tenant_id", "user_id", "tenant_id"),
+    )
+
+
+class RefreshToken(Base):
+    """One issued refresh token, stored as a hash (D21).
+
+    The plaintext token exists only in the response that carried it and in the
+    client. What is kept here is a SHA-256 digest: enough to recognise a token
+    that comes back, useless to anyone who reads the table. SHA-256 rather than
+    argon2 precisely because this is not a password — the token is
+    high-entropy random, so there is no dictionary to run against the digest,
+    and latency on every renewal would pay for nothing.
+
+    ``family_id`` links every token descended from one login. Rotation replaces
+    a token and records ``replaced_by_id``; presenting an already-replaced
+    token means two parties hold it, and the entire family is revoked rather
+    than just that token — the thief would otherwise keep the newest one.
+    """
+
+    __tablename__ = "refresh_tokens"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid7)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    token_hash: Mapped[str] = mapped_column(String(SHA256_HEX_LENGTH), unique=True)
+    family_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    replaced_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("refresh_tokens.id", ondelete="SET NULL"), default=None
+    )
+    issued_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
+    expires_at: Mapped[dt.datetime] = mapped_column()
+    revoked_at: Mapped[dt.datetime | None] = mapped_column(default=None)
+    # Shown to the user when listing their sessions, and the only thing that
+    # distinguishes one device from another after the fact.
+    user_agent: Mapped[str | None] = mapped_column(String(400), default=None)
+    ip: Mapped[str | None] = mapped_column(INET, default=None)
+
+    __table_args__ = (
+        CheckConstraint("expires_at > issued_at", name="expiry_after_issue"),
+        # Read only by the sweeper that removes expired tokens.
+        Index("ix_refresh_tokens_expires_at", "expires_at"),
     )
