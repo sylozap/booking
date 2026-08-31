@@ -28,7 +28,16 @@ POSTGRES_IMAGE = "postgres:16-alpine"
 #: Alembic's own bookkeeping. Present even when the schema is empty.
 VERSION_TABLE = "alembic_version"
 
-EXPECTED_TABLES: frozenset[str] = frozenset({"users", "oauth_accounts"})
+EXPECTED_TABLES: frozenset[str] = frozenset(
+    {
+        "users",
+        "oauth_accounts",
+        "permissions",
+        "roles",
+        "role_permissions",
+        "user_roles",
+    }
+)
 
 
 def _table_names(url: str) -> frozenset[str]:

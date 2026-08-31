@@ -27,6 +27,7 @@ from typing import Final
 from sqlalchemy import (
     Enum,
     ForeignKey,
+    Index,
     String,
     Text,
     UniqueConstraint,
@@ -120,3 +121,92 @@ class OAuthAccount(Base):
     user: Mapped[User] = relationship(back_populates="oauth_accounts", lazy="raise")
 
     __table_args__ = (UniqueConstraint("provider", "provider_user_id"),)
+
+
+class Permission(Base):
+    """One capability. Access is always checked against these, never a role."""
+
+    __tablename__ = "permissions"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid7)
+    # A plain string, not a CHECK-constrained enum: the catalogue of codes lives
+    # in identity.domain.access and is reconciled into this table by the seed.
+    # Encoding it twice would mean a schema migration for every new capability.
+    code: Mapped[str] = mapped_column(String(64), unique=True)
+    description: Mapped[str] = mapped_column(Text, default="")
+
+
+class Role(Base):
+    """A named bundle of permissions.
+
+    ``is_system`` marks the roles the platform defines for itself. The seed owns
+    them and reconciles their permissions on every run; an administrator may
+    neither edit nor delete one, because the code assumes CLIENT means what it
+    means.
+    """
+
+    __tablename__ = "roles"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid7)
+    # Open on purpose. System roles come from the domain catalogue; an
+    # organization-defined role would be a row here with is_system false, and a
+    # CHECK constraint over the enum would make that unrepresentable.
+    code: Mapped[str] = mapped_column(String(64), unique=True)
+    description: Mapped[str] = mapped_column(Text, default="")
+    is_system: Mapped[bool] = mapped_column(default=False)
+
+    permissions: Mapped[list[Permission]] = relationship(secondary="role_permissions", lazy="raise")
+
+
+class RolePermission(Base):
+    """Which permissions a role carries. A plain many-to-many."""
+
+    __tablename__ = "role_permissions"
+
+    role_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True
+    )
+    permission_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("permissions.id", ondelete="CASCADE"), primary_key=True
+    )
+
+
+class UserRole(Base):
+    """A grant: this user holds this role in this organization (D20).
+
+    ``tenant_id`` is the organization the grant applies to, and it is what makes
+    the model multi-tenant: the same person is a CLIENT in one organization and
+    an ORG_ADMIN in another, and neither grant implies anything about the other.
+    It is NULL only for platform-wide roles — today, SUPER_ADMIN alone.
+
+    The uniqueness of (user, role, tenant) cannot be a primary key, because a
+    primary key column is NOT NULL and this one is nullable by design. It is a
+    unique constraint instead — declared NULLS NOT DISTINCT, without which
+    PostgreSQL treats every NULL as its own value and the same platform-wide
+    grant could be inserted any number of times.
+    """
+
+    __tablename__ = "user_roles"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid7)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    role_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("roles.id", ondelete="RESTRICT"))
+    tenant_id: Mapped[uuid.UUID | None] = mapped_column(default=None)
+    granted_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
+    # Who granted it. NULL when the grant came from an event rather than from a
+    # person — a specialist invitation accepted in `catalog`, for instance.
+    granted_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), default=None
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "role_id",
+            "tenant_id",
+            postgresql_nulls_not_distinct=True,
+        ),
+        # The hot path: "what may this user do in this organization", asked on
+        # every token issue.
+        Index("ix_user_roles_user_id_tenant_id", "user_id", "tenant_id"),
+    )

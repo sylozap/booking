@@ -83,6 +83,19 @@ class TokenExpired(DomainError):
     title = "Token expired"
 
 
+class RoleScopeMismatch(DomainError):
+    """A grant named a tenant for a platform-wide role, or omitted one (D20).
+
+    ``SUPER_ADMIN`` belongs to no organization; every other role means nothing
+    without one. Both mistakes produce a grant that no permission check can
+    interpret, so neither is allowed to reach the table.
+    """
+
+    code = "role_scope_mismatch"
+    http_status = HTTPStatus.BAD_REQUEST
+    title = "Role scope does not match the tenant"
+
+
 class TenantMismatch(DomainError):
     """A resource was addressed from outside the tenant that owns it (D40).
 
