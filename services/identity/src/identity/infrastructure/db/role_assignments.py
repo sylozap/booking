@@ -1,9 +1,15 @@
-"""Granting and revoking roles.
+"""Granting and revoking roles, with the audit record that must accompany it.
 
-Both operations report whether they changed anything, which the database
-decides rather than a preceding SELECT: granting a role somebody already holds
-is a no-op, and two concurrent grants must not both believe they were first.
-The audit record that has to accompany a real change arrives with P1-T12.
+The audit entry is written in the same transaction as the grant (D48). Not
+afterwards, and not by a listener: a permission change that is not in the log is
+worse than one that never happened, because the log is what an investigation
+trusts. Two statements, one transaction, no way to have one without the other.
+
+An entry is written only when something actually changed. Whether anything did
+is the database's answer rather than a preceding SELECT's — two concurrent
+grants must not both believe they were first — and recording a grant that was
+a no-op would fill the log with events that did not occur, which is how a log
+stops being read.
 
 The caller owns the transaction (CODING_STANDARDS 7). The scenario that calls
 this arrives with the consumer of ``SpecialistInvited`` in phase 2 (ADR-0013);
@@ -15,15 +21,16 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, insert, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from chassis import uuid7
 from identity.domain.access import RoleCode, requires_tenant
+from identity.domain.audit import AuditAction
 from identity.domain.exceptions import RoleScopeMismatch
 from identity.domain.identifiers import TenantId, UserId
-from identity.infrastructure.db.models import Role, UserRole
+from identity.infrastructure.db.models import AuditEntry, Role, UserRole
 
 
 class UnknownRoleError(LookupError):
@@ -69,7 +76,17 @@ class RoleAssignmentRepository:
             .on_conflict_do_nothing(index_elements=["user_id", "role_id", "tenant_id"])
             .returning(UserRole.id)
         )
-        return (await self._session.scalars(statement)).one_or_none() is not None
+        if (await self._session.scalars(statement)).one_or_none() is None:
+            return False
+
+        await self._record(
+            action=AuditAction.ROLE_GRANTED,
+            actor_user_id=actor_user_id,
+            subject_user_id=user_id,
+            role=role,
+            tenant_id=tenant_id,
+        )
+        return True
 
     async def revoke(
         self,
@@ -77,6 +94,7 @@ class RoleAssignmentRepository:
         user_id: UserId,
         role: RoleCode,
         tenant_id: TenantId | None,
+        actor_user_id: UserId | None = None,
     ) -> bool:
         """Take the role away in this tenant. True if anything changed.
 
@@ -99,7 +117,17 @@ class RoleAssignmentRepository:
             )
             .returning(UserRole.id)
         )
-        return (await self._session.scalars(statement)).one_or_none() is not None
+        if (await self._session.scalars(statement)).one_or_none() is None:
+            return False
+
+        await self._record(
+            action=AuditAction.ROLE_REVOKED,
+            actor_user_id=actor_user_id,
+            subject_user_id=user_id,
+            role=role,
+            tenant_id=tenant_id,
+        )
+        return True
 
     async def roles_in_tenant(
         self, *, user_id: UserId, tenant_id: TenantId | None
@@ -114,6 +142,29 @@ class RoleAssignmentRepository:
             )
         )
         return tuple(RoleCode(code) for code in rows.all())
+
+    async def _record(
+        self,
+        *,
+        action: AuditAction,
+        actor_user_id: UserId | None,
+        subject_user_id: UserId,
+        role: RoleCode,
+        tenant_id: TenantId | None,
+    ) -> None:
+        await self._session.execute(
+            insert(AuditEntry).values(
+                id=uuid7(),
+                action=action,
+                actor_user_id=actor_user_id,
+                subject_user_id=subject_user_id,
+                # The code, not the role's id: the log must stay readable after
+                # the role is deleted, which is the change worth investigating.
+                role_code=role.value,
+                tenant_id=tenant_id,
+                detail={},
+            )
+        )
 
     async def _role_id(self, role: RoleCode) -> uuid.UUID:
         role_id = await self._session.scalar(select(Role.id).where(Role.code == role.value))

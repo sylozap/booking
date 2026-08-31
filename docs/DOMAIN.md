@@ -140,8 +140,10 @@ roles            id, code UNIQUE, is_system
 role_permissions role_id, permission_id                       PK(role_id, permission_id)
 user_roles       id, user_id, role_id, tenant_id NULL, granted_at, granted_by_user_id NULL
                  UNIQUE NULLS NOT DISTINCT (user_id, role_id, tenant_id)
-refresh_tokens   id, user_id, token_hash, family_id, expires_at, revoked_at,
+refresh_tokens   id, user_id, token_hash, family_id, issued_at, expires_at, revoked_at,
                  replaced_by NULL, user_agent, ip
+audit_log        id, occurred_at, action, actor_user_id NULL, subject_user_id,
+                 role_code, tenant_id NULL, detail jsonb
 ```
 
 `user_roles.tenant_id` обязателен по смыслу: `SPECIALIST` и `ORG_ADMIN` — роли внутри
@@ -153,6 +155,10 @@ refresh_tokens   id, user_id, token_hash, family_id, expires_at, revoked_at,
 `tenant_id` невыразим. Уникальность гранта обеспечивает ограничение, и оно объявлено
 `NULLS NOT DISTINCT` — иначе каждый `NULL` считается отдельным значением и один и тот
 же платформенный грант вставился бы неограниченное число раз.
+
+`audit_log.occurred_at` заполняется `clock_timestamp()`, а не `now()`: второе — момент
+начала транзакции, и длинная транзакция проставила бы всем записям время своего старта
+вместо времени действия.
 
 ### catalog
 

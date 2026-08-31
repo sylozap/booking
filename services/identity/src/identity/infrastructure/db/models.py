@@ -34,10 +34,11 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
-from sqlalchemy.dialects.postgresql import CITEXT, INET
+from sqlalchemy.dialects.postgresql import CITEXT, INET, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from chassis import uuid7
+from identity.domain.audit import AuditAction
 from identity.domain.user import OAuthProvider, UserStatus
 from identity.infrastructure.db.base import Base
 
@@ -46,7 +47,7 @@ from identity.infrastructure.db.base import Base
 SHA256_HEX_LENGTH: Final = 64
 
 
-def _enum(enum_type: type[UserStatus | OAuthProvider], name: str) -> Enum:
+def _enum(enum_type: type[UserStatus | OAuthProvider | AuditAction], name: str) -> Enum:
     """A CHECK-constrained VARCHAR rather than a native PostgreSQL enum.
 
     Adding a value to a native enum requires ALTER TYPE, which until
@@ -252,4 +253,44 @@ class RefreshToken(Base):
         CheckConstraint("expires_at > issued_at", name="expiry_after_issue"),
         # Read only by the sweeper that removes expired tokens.
         Index("ix_refresh_tokens_expires_at", "expires_at"),
+    )
+
+
+class AuditEntry(Base):
+    """One permission change, recorded for later investigation (D48).
+
+    Append-only by convention and by the absence of anything that updates it.
+    The actor may be NULL — a grant issued by an event has no human behind it —
+    but the subject and the moment never are: an entry that cannot answer "who
+    was affected, and when" answers nothing.
+
+    ``role_code`` and ``tenant_id`` are copied in rather than referenced. The
+    log has to stay readable after the role is deleted, which is exactly the
+    change someone will want to investigate.
+    """
+
+    __tablename__ = "audit_log"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid7)
+    # clock_timestamp(), not now(): PostgreSQL's now() is the moment the
+    # transaction began, so a long-running one — a batch role sync — would
+    # stamp every entry with the batch's start time rather than the action's.
+    # For a log whose whole purpose is answering "when did this happen", the
+    # wall clock at the statement is the honest answer.
+    occurred_at: Mapped[dt.datetime] = mapped_column(server_default=func.clock_timestamp())
+    action: Mapped[AuditAction] = mapped_column(_enum(AuditAction, "audit_action"))
+    actor_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), default=None
+    )
+    subject_user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    role_code: Mapped[str] = mapped_column(String(64))
+    tenant_id: Mapped[uuid.UUID | None] = mapped_column(default=None)
+    # Free-form context for the action. Never personal data: the log is read by
+    # operators, and ADR-0017 keeps PII out of everything they read.
+    detail: Mapped[dict[str, str]] = mapped_column(JSONB, default=dict)
+
+    __table_args__ = (
+        # "Everything that happened to this person's access", the question an
+        # investigation actually starts from.
+        Index("ix_audit_log_subject_user_id_occurred_at", "subject_user_id", "occurred_at"),
     )
